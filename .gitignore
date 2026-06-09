@@ -1,0 +1,15 @@
+# MinIO local data directory
+data/
+
+# Environment configurations
+.env
+
+# Backups
+backups/
+*.zip
+*.tar.gz
+*.tgz
+
+# OS files
+.DS_Store
+Thumbs.db

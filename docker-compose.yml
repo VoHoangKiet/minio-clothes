@@ -1,0 +1,58 @@
+services:
+  minio:
+    image: quay.io/minio/minio:latest
+    container_name: minio-server
+    restart: always
+    ports:
+      - "${MINIO_API_PORT}:9000"
+      - "${MINIO_CONSOLE_PORT}:9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    volumes:
+      - ${MINIO_VOLUMES}:/data
+    command: server /data --console-address :9001
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9000/minio/health/live || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  minio-init:
+    image: quay.io/minio/mc:latest
+    container_name: minio-client-init
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      # Wait a second for security
+      sleep 1;
+      echo \"Connecting to MinIO server...\"
+      mc alias set myminio http://minio:9000 ${MINIO_ROOT_USER} ${MINIO_ROOT_PASSWORD};
+      
+      # Auto-create default buckets
+      if [ -n \"${MINIO_DEFAULT_BUCKETS}\" ]; then
+        echo \"Creating default buckets...\"
+        for bucket in $$(echo ${MINIO_DEFAULT_BUCKETS} | tr ',' ' '); do
+          if ! mc ls myminio/$$bucket > /dev/null 2>&1; then
+            echo \"Creating bucket: $$bucket\"
+            mc mb myminio/$$bucket
+          else
+            echo \"Bucket $$bucket already exists.\"
+          fi
+        done
+      fi
+
+      # Set public download policy for specified buckets
+      if [ -n \"${MINIO_PUBLIC_BUCKETS}\" ]; then
+        echo \"Setting download policies for public buckets...\"
+        for bucket in $$(echo ${MINIO_PUBLIC_BUCKETS} | tr ',' ' '); do
+          echo \"Setting policy 'download' for bucket: $$bucket\"
+          mc anonymous set download myminio/$$bucket
+        done
+      fi
+
+      echo \"MinIO initialization completed successfully!\"
+      exit 0
+      "
