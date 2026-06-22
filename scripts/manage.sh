@@ -65,7 +65,15 @@ case "$ACTION" in
         echo -e "${CYAN}--------------------------------------------------${NC}"
         echo -e "${CYAN}Khởi động dịch vụ MinIO trên Docker...${NC}"
         echo -e "${CYAN}--------------------------------------------------${NC}"
+        
+        # Đảm bảo tạo docker network dùng chung trước khi khởi chạy
+        if ! docker network inspect clothes-network >/dev/null 2>&1; then
+            echo -e "${YELLOW}Đang tạo Docker network 'clothes-network'...${NC}"
+            docker network create clothes-network >/dev/null
+        fi
+        
         docker compose up -d
+
         
         echo -e ""
         echo -e "${GREEN}==================================================${NC}"

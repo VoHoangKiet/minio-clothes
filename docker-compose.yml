@@ -9,6 +9,10 @@ services:
     environment:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+      MINIO_NOTIFY_KAFKA_ENABLE_primary: "on"
+      MINIO_NOTIFY_KAFKA_BROKERS_primary: ${MINIO_NOTIFY_KAFKA_BROKERS}
+      MINIO_NOTIFY_KAFKA_TOPIC_primary: ${MINIO_NOTIFY_KAFKA_TOPIC}
+      MINIO_NOTIFY_KAFKA_QUEUE_DIR_primary: /data/.minio/events
     volumes:
       - ${MINIO_VOLUMES}:/data
     command: server /data --console-address :9001
@@ -17,6 +21,8 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+    networks:
+      - clothes-network
 
   minio-init:
     image: quay.io/minio/mc:latest
@@ -24,7 +30,9 @@ services:
     depends_on:
       minio:
         condition: service_healthy
-    entrypoint: >
+    networks:
+      - clothes-network
+    entrypoint: |
       /bin/sh -c "
       # Wait a second for security
       sleep 1;
@@ -53,6 +61,22 @@ services:
         done
       fi
 
+      # Configure Event Notification for buckets if Kafka target is enabled
+      if [ -n \"${MINIO_NOTIFY_KAFKA_BROKERS}\" ]; then
+        echo \"Configuring Kafka Event Notifications...\"
+        for bucket in $$(echo ${MINIO_DEFAULT_BUCKETS} | tr ',' ' '); do
+          echo \"Setting Kafka event notification for bucket: $$bucket\"
+          mc event remove myminio/$$bucket arn:minio:sqs::primary:kafka > /dev/null 2>&1
+          mc event add myminio/$$bucket arn:minio:sqs::primary:kafka --event put,delete
+        done
+      fi
+
       echo \"MinIO initialization completed successfully!\"
       exit 0
       "
+
+networks:
+  clothes-network:
+    name: clothes-network
+    external: true
+

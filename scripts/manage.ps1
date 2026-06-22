@@ -52,6 +52,13 @@ switch ($Action) {
         Write-Host "--------------------------------------------------" -ForegroundColor Cyan
         Write-Host "Khoi dong dich vu MinIO tren Docker..." -ForegroundColor Cyan
         Write-Host "--------------------------------------------------" -ForegroundColor Cyan
+        
+        # Đảm bảo tạo docker network dùng chung trước khi khởi chạy
+        if (-not (docker network ls -q --filter name=clothes-network)) {
+            Write-Host "Dang tao Docker network 'clothes-network'..." -ForegroundColor Gray
+            docker network create clothes-network | Out-Null
+        }
+        
         docker compose up -d
         
         Write-Host ""
